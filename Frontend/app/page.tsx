@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { Check, Brain, Sun, Moon } from 'lucide-react'
+import { Check, Brain, Sun, Moon, LayoutDashboard, FileText } from 'lucide-react'
 import {
   AppStep,
   TaxConfig,
@@ -13,14 +13,16 @@ import {
   getQuarterMonths,
   computeReport,
 } from '@/lib/types'
-import { Step1Period } from '@/components/step1-period'
-import { Step2Upload } from '@/components/step2-upload'
-import { Step3Review } from '@/components/step3-review'
-import { Step4Report } from '@/components/step4-report'
-import { TaxConfigModal } from '@/components/tax-config-modal'
-import { HistoryPanel } from '@/components/history-panel'
-import { cn } from '@/lib/utils'
+import { Step1Period }      from '@/components/step1-period'
+import { Step2Upload }      from '@/components/step2-upload'
+import { Step3Review }      from '@/components/step3-review'
+import { Step4Report }      from '@/components/step4-report'
+import { TaxConfigModal }   from '@/components/tax-config-modal'
+import { HistoryPanel }     from '@/components/history-panel'
+import { Dashboard }        from '@/components/dashboard'
+import { cn }               from '@/lib/utils'
 
+// ── Wizard step definitions ───────────────────────────────────────────────────
 const STEPS: { id: AppStep; label: string }[] = [
   { id: 'period', label: 'Periodo' },
   { id: 'upload', label: 'Archivos' },
@@ -31,6 +33,7 @@ const STEPS: { id: AppStep; label: string }[] = [
 const today = new Date()
 const defaultStartMonth = Math.floor(today.getMonth() / 3) * 3
 
+// ── Wizard step indicator ─────────────────────────────────────────────────────
 function WizardStepper({ current }: { current: AppStep }) {
   const currentIdx = STEPS.findIndex((s) => s.id === current)
   return (
@@ -77,25 +80,26 @@ function WizardStepper({ current }: { current: AppStep }) {
   )
 }
 
+// ── Root page ─────────────────────────────────────────────────────────────────
 export default function Home() {
+  const [view, setView]           = useState<'wizard' | 'dashboard'>('dashboard')
   const [step, setStep]           = useState<AppStep>('period')
   const [taxConfig, setTaxConfig] = useState<TaxConfig>(DEFAULT_TAX_CONFIG)
-  const [startMonth, setStartMonth] = useState(defaultStartMonth)
+  const [startMonth, setStartMonth]   = useState(defaultStartMonth)
   const [selectedYear, setSelectedYear] = useState(today.getFullYear())
   const [months, setMonths]       = useState<MonthData[]>(getQuarterMonths(defaultStartMonth, today.getFullYear()))
-  const [reportRows, setReportRows] = useState<ReportRow[]>([])
+  const [reportRows, setReportRows]   = useState<ReportRow[]>([])
   const [history, setHistory]     = useState<HistoryEntry[]>([])
   const [dark, setDark]           = useState(true)
 
-  // Apply dark class to html element
+  // Apply dark class to <html>
   useEffect(() => {
     const html = document.documentElement
     if (dark) html.classList.add('dark')
-    else html.classList.remove('dark')
+    else      html.classList.remove('dark')
   }, [dark])
 
-  // ── Step navigation ──────────────────────────────────────────────────────────
-
+  // ── Step navigation ─────────────────────────────────────────────────────────
   const handlePeriodChange = (month: number, year: number) => {
     setStartMonth(month)
     setSelectedYear(year)
@@ -111,10 +115,8 @@ export default function Home() {
     setStep('report')
   }, [months, taxConfig])
 
-  // Recalculate in-place while staying on the review step
   const handleRecalculate = useCallback(() => {
-    const rows = computeReport(months, taxConfig)
-    setReportRows(rows)
+    setReportRows(computeReport(months, taxConfig))
   }, [months, taxConfig])
 
   const handleTaxChange = (cfg: TaxConfig) => {
@@ -124,21 +126,21 @@ export default function Home() {
     }
   }
 
-  // ── Finalize: save to history ────────────────────────────────────────────────
+  // ── Finalize — save to history ──────────────────────────────────────────────
   const handleFinalize = useCallback(() => {
     const m0 = months[0]
     const m2 = months[2]
-    const label = `${MONTHS_SHORT[m0.index]} – ${MONTHS_SHORT[m2.index]} ${m0.year}`
+    const label  = `${MONTHS_SHORT[m0.index]} – ${MONTHS_SHORT[m2.index]} ${m0.year}`
     const period = `${MONTHS_SHORT[m0.index]}_${MONTHS_SHORT[m2.index]}_${m0.year}`
     const grossTotal = reportRows.reduce((s, r) => s + r.valorTotal, 0)
-    const netTotal   = reportRows.reduce((s, r) => s + r.totalNeto, 0)
+    const netTotal   = reportRows.reduce((s, r) => s + r.totalNeto,  0)
 
     const entry: HistoryEntry = {
       id: `${Date.now()}`,
       createdAt: new Date().toISOString(),
       period,
       label,
-      months: months.map((m) => ({ ...m, file: null })), // File not serializable
+      months: months.map((m) => ({ ...m, file: null })),
       reportRows: [...reportRows],
       taxConfig: { ...taxConfig },
       grossTotal,
@@ -148,19 +150,29 @@ export default function Home() {
     setHistory((prev) => [...prev, entry])
   }, [months, reportRows, taxConfig])
 
-  // ── Restore from history ─────────────────────────────────────────────────────
-  const handleRestore = (entry: HistoryEntry) => {
+  // ── Restore from history / dashboard ───────────────────────────────────────
+  const handleRestore = useCallback((entry: HistoryEntry) => {
     setMonths(entry.months)
     setReportRows(entry.reportRows)
     setTaxConfig(entry.taxConfig)
     setStep('report')
-  }
+    setView('wizard')
+  }, [])
+
+  // ── Start a fresh report from dashboard ────────────────────────────────────
+  const handleNewReport = useCallback(() => {
+    setStep('period')
+    setView('wizard')
+  }, [])
+
+  const isDashboard = view === 'dashboard'
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* Header */}
+      {/* ── Header ── */}
       <header className="sticky top-0 z-30 border-b border-border bg-card/90 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+
           {/* Logo */}
           <div className="flex items-center gap-2.5 shrink-0">
             <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-md shadow-primary/25">
@@ -174,8 +186,43 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Stepper */}
-          <WizardStepper current={step} />
+          {/* Center: nav toggle or wizard stepper */}
+          {isDashboard ? (
+            <nav className="flex items-center gap-1 rounded-xl bg-secondary p-1 text-xs font-medium">
+              <button
+                onClick={() => setView('dashboard')}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all',
+                  isDashboard
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <LayoutDashboard className="w-3.5 h-3.5" />
+                Dashboard
+              </button>
+              <button
+                onClick={() => setView('wizard')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-muted-foreground hover:text-foreground transition-all"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                Nuevo informe
+              </button>
+            </nav>
+          ) : (
+            <div className="flex flex-col items-center gap-0.5">
+              <div className="flex items-center gap-2 mb-1">
+                <button
+                  onClick={() => setView('dashboard')}
+                  className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                >
+                  <LayoutDashboard className="w-3 h-3" />
+                  Dashboard
+                </button>
+              </div>
+              <WizardStepper current={step} />
+            </div>
+          )}
 
           {/* Right actions */}
           <div className="flex items-center gap-2 shrink-0">
@@ -198,41 +245,51 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Main */}
+      {/* ── Main content ── */}
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-10">
-        {step === 'period' && (
-          <Step1Period
-            selectedMonth={startMonth}
-            selectedYear={selectedYear}
-            onChange={handlePeriodChange}
-            onNext={() => setStep('upload')}
+        {isDashboard ? (
+          <Dashboard
+            history={history}
+            onRestore={handleRestore}
+            onNewReport={handleNewReport}
           />
-        )}
-        {step === 'upload' && (
-          <Step2Upload
-            months={months}
-            onMonthsUpdate={setMonths}
-            onNext={handleUploadNext}
-            onBack={() => setStep('period')}
-          />
-        )}
-        {step === 'review' && (
-          <Step3Review
-            months={months}
-            onMonthsUpdate={setMonths}
-            onRecalculate={handleRecalculate}
-            onNext={handleReviewNext}
-            onBack={() => setStep('upload')}
-          />
-        )}
-        {step === 'report' && (
-          <Step4Report
-            months={months}
-            reportRows={reportRows}
-            taxConfig={taxConfig}
-            onBack={() => setStep('review')}
-            onFinalize={handleFinalize}
-          />
+        ) : (
+          <>
+            {step === 'period' && (
+              <Step1Period
+                selectedMonth={startMonth}
+                selectedYear={selectedYear}
+                onChange={handlePeriodChange}
+                onNext={() => setStep('upload')}
+              />
+            )}
+            {step === 'upload' && (
+              <Step2Upload
+                months={months}
+                onMonthsUpdate={setMonths}
+                onNext={handleUploadNext}
+                onBack={() => setStep('period')}
+              />
+            )}
+            {step === 'review' && (
+              <Step3Review
+                months={months}
+                onMonthsUpdate={setMonths}
+                onRecalculate={handleRecalculate}
+                onNext={handleReviewNext}
+                onBack={() => setStep('upload')}
+              />
+            )}
+            {step === 'report' && (
+              <Step4Report
+                months={months}
+                reportRows={reportRows}
+                taxConfig={taxConfig}
+                onBack={() => setStep('review')}
+                onFinalize={handleFinalize}
+              />
+            )}
+          </>
         )}
       </main>
     </div>

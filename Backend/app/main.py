@@ -1,12 +1,24 @@
 from fastapi import FastAPI
 
-app = FastAPI(title="NeuralReport API", version="0.1.0")
+from app.core.config import settings
+from app.database import Base, engine
+from app.routers import include_routers
 
 
-@app.get("/health")
-def health() -> dict:
-	return {"status": "ok"}
+# Crear tablas automáticamente si no existen
+# (en producción esto se reemplaza por Alembic)
+Base.metadata.create_all(bind=engine)
 
-@app.get("/health2")
-def health2() -> dict:
-	return {"status": "ok"}
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    debug=settings.debug,
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
+
+include_routers(app)
+
+@app.get("/", tags=["Health"])
+def health_check():
+    return {"app": settings.app_name, "version": settings.app_version, "status": "ok"}
