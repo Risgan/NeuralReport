@@ -13,6 +13,11 @@ def get_years(db: Session = Depends(get_db)) -> list[YearResponse]:
 	service = CatalogsService(db)
 	return service.get_years(only_active=True)
 
+@router.post("/years", response_model=YearResponse)
+def create_year(year: int, db: Session = Depends(get_db)) -> YearResponse:
+    service = CatalogsService(db)
+    return service.create_year(year)
+
 
 @router.get("/months", response_model=list[MonthResponse])
 def get_months(db: Session = Depends(get_db)) -> list[MonthResponse]:

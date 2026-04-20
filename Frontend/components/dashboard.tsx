@@ -12,6 +12,7 @@ import {
 import { HistoryEntry, formatCurrency, TaxConfig } from '@/lib/types'
 import { exportConsolidated } from '@/lib/excel'
 import { cn } from '@/lib/utils'
+import { catalogsService } from '@/services'
 
 interface DashboardProps {
   history: HistoryEntry[]
@@ -96,6 +97,18 @@ export function Dashboard({ history, onRestore, onNewReport }: DashboardProps) {
 
   const empty = history.length === 0
 
+  const handleCreateReportClick = async () => {
+    try {
+      const years = await catalogsService.getYears()
+      console.log('Catalog years:', years)
+      const months = await catalogsService.getMonths()
+      console.log('Catalog months:', months)
+      // onNewReport()
+    } catch (error) {
+      console.error('Error fetching years:', error)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {/* Page header */}
@@ -129,7 +142,8 @@ export function Dashboard({ history, onRestore, onNewReport }: DashboardProps) {
             </p>
           </div>
           <button
-            onClick={onNewReport}
+            onClick={handleCreateReportClick}
+            // onClick={onNewReport}
             className="mt-2 flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground
               font-semibold text-sm hover:brightness-110 transition-all"
           >
